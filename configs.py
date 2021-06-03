@@ -18,10 +18,10 @@ def get_datasets(dataset, augment_clf_train=False, add_indices_to_data=False, nu
     }
 
     PATHS = {
-        'cifar10': '/data/cifar10/',
-        'cifar100': '/data/cifar100/',
-        'stl10': '/data/stl10/',
-        'imagenet': '/data/imagenet/2012/'
+        'cifar10': './data/cifar10/',
+        'cifar100': './data/cifar100/',
+        'stl10': './data/stl10/',
+        'imagenet': './data/imagenet/2012/'
     }
     try:
         with open('dataset-paths.json', 'r') as f:

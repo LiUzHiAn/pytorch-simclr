@@ -29,17 +29,19 @@ parser.add_argument("--cosine-anneal", action='store_true', help="Use cosine ann
 parser.add_argument("--arch", type=str, default='resnet50', help='Encoder architecture',
                     choices=['resnet18', 'resnet34', 'resnet50'])
 parser.add_argument("--num-workers", type=int, default=2, help='Number of threads for data loaders')
-parser.add_argument("--test-freq", type=int, default=10, help='Frequency to fit a linear clf with L-BFGS for testing'
+parser.add_argument("--test-freq", type=int, default=50, help='Frequency to fit a linear clf with L-BFGS for testing'
                                                               'Not appropriate for large datasets. Set 0 to avoid '
                                                               'classifier only training here.')
 parser.add_argument("--filename", type=str, default='ckpt.pth', help='Output file name')
+parser.add_argument("--lars", action='store_true', help="Use torch LARS")
+
 args = parser.parse_args()
 args.lr = args.base_lr * (args.batch_size / 256)
 
 args.git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'])
 args.git_diff = subprocess.check_output(['git', 'diff'])
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 clf = None
@@ -49,9 +51,9 @@ trainset, testset, clftrainset, num_classes, stem = get_datasets(args.dataset)
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True,
                                           num_workers=args.num_workers, pin_memory=True)
-testloader = torch.utils.data.DataLoader(testset, batch_size=1000, shuffle=False, num_workers=args.num_workers,
+testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=args.num_workers,
                                          pin_memory=True)
-clftrainloader = torch.utils.data.DataLoader(clftrainset, batch_size=1000, shuffle=False, num_workers=args.num_workers,
+clftrainloader = torch.utils.data.DataLoader(clftrainset, batch_size=100, shuffle=False, num_workers=args.num_workers,
                                              pin_memory=True)
 
 # Model
@@ -96,7 +98,7 @@ base_optimizer = optim.SGD(list(net.parameters()) + list(critic.parameters()), l
                            momentum=args.momentum)
 if args.cosine_anneal:
     scheduler = CosineAnnealingWithLinearRampLR(base_optimizer, args.num_epochs)
-encoder_optimizer = LARS(base_optimizer, trust_coef=1e-3)
+encoder_optimizer = LARS(base_optimizer, trust_coef=1e-3) if args.lars else base_optimizer
 
 
 # Training
@@ -129,8 +131,8 @@ for epoch in range(start_epoch, start_epoch + args.num_epochs):
         acc = test(testloader, device, net, clf)
         if acc > best_acc:
             best_acc = acc
-        save_checkpoint(net, clf, critic, epoch, args, os.path.basename(__file__))
+        save_checkpoint(net, clf, critic, epoch, args, os.path.basename(__file__), acc)
     elif args.test_freq == 0:
-        save_checkpoint(net, clf, critic, epoch, args, os.path.basename(__file__))
+        save_checkpoint(net, clf, critic, epoch, args, os.path.basename(__file__), acc)
     if args.cosine_anneal:
         scheduler.step()

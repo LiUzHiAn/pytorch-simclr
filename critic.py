@@ -24,7 +24,7 @@ class LinearCritic(nn.Module):
         sim22 = self.cossim(z2.unsqueeze(-2), z2.unsqueeze(-3)) / self.temperature
         sim12 = self.cossim(z1.unsqueeze(-2), z2.unsqueeze(-3)) / self.temperature
         d = sim12.shape[-1]
-        sim11[..., range(d), range(d)] = float('-inf')
+        sim11[..., range(d), range(d)] = float('-inf')  # 自己和自己(对角线元素)设置为-inf
         sim22[..., range(d), range(d)] = float('-inf')
         raw_scores1 = torch.cat([sim12, sim11], dim=-1)
         raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)
